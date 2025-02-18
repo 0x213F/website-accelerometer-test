@@ -38,13 +38,10 @@
         const body = document.body;
         
         // Configuration
-        const FACE_DOWN_THRESHOLD = 10; // degrees of tolerance
-        const PEEK_ANGLE_MIN = 30;  // minimum angle for peeking
-        const PEEK_ANGLE_MAX = 80;  // maximum angle for peeking
-        const TIME_THRESHOLD = 200; // 0.2 seconds in milliseconds
-
-        let faceDownStartTime = null;
-        let isFaceDown = false;
+        const BETA_TARGET = 180;  // face down
+        const BETA_TOLERANCE = 10; // degrees of tolerance
+        const GAMMA_MIN = 20;     // minimum tilt for success
+        const GAMMA_MAX = 60;     // maximum tilt for success
 
         function requestPermission() {
             if (typeof DeviceOrientationEvent !== 'undefined' && 
@@ -64,41 +61,25 @@
         function handleOrientation(event) {
             // Beta: front/back tilt (-180 to 180)
             // Gamma: left/right tilt (-90 to 90)
-            // Alpha: compass direction (0 to 360)
             const { beta, gamma } = event;
             
             // Debug info
             debugEl.textContent = `Beta: ${Math.round(beta)}°\nGamma: ${Math.round(gamma)}°`;
 
-            // Check if phone is face down (beta ~= 180 or -180)
-            const isFacingDown = Math.abs(Math.abs(beta) - 180) < FACE_DOWN_THRESHOLD && 
-                               Math.abs(gamma) < FACE_DOWN_THRESHOLD;
+            // Check if phone is roughly face down (beta ~= 180)
+            const betaDeviation = Math.abs(Math.abs(beta) - BETA_TARGET);
+            const isFacingDown = betaDeviation < BETA_TOLERANCE;
 
-            if (isFacingDown && !isFaceDown) {
-                // Just started facing down
-                isFaceDown = true;
-                faceDownStartTime = Date.now();
-            } else if (!isFacingDown) {
-                // Not facing down anymore
-                isFaceDown = false;
-
-                // Check if we were face down long enough and now in peek position
-                if (faceDownStartTime && 
-                    (Date.now() - faceDownStartTime) >= TIME_THRESHOLD) {
-                    
-                    // Check if phone is now in peek position
-                    // We want beta to be between PEEK_ANGLE_MIN and PEEK_ANGLE_MAX
-                    // and gamma should be relatively small
-                    const isPeeking = beta > PEEK_ANGLE_MIN && 
-                                    beta < PEEK_ANGLE_MAX && 
-                                    Math.abs(gamma) < 20;
-
-                    if (isPeeking) {
-                        body.classList.add('success');
-                    } else {
-                        body.classList.remove('success');
-                    }
+            if (isFacingDown) {
+                // Check if gamma is in the correct range
+                const gammaAbs = Math.abs(gamma);
+                if (gammaAbs >= GAMMA_MIN && gammaAbs <= GAMMA_MAX) {
+                    body.classList.add('success');
+                } else {
+                    body.classList.remove('success');
                 }
+            } else {
+                body.classList.remove('success');
             }
         }
 
