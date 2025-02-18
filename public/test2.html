@@ -52,11 +52,11 @@
         const instructions = document.getElementById('instructions');
         
         // Configuration
-        const TAP_THRESHOLD = 20;         // Minimum acceleration to register as a tap
+        const TAP_THRESHOLD = 12;         // Minimum acceleration to register as a tap
         const TAP_TIMEOUT = 500;          // Maximum time between taps (ms)
         const COOLDOWN_PERIOD = 1000;     // Time before allowing new tap detection (ms)
         const SUCCESS_DURATION = 2000;     // How long to show the green screen (ms)
-        const GAMMA_LIMIT = 60;           // Maximum allowable tilt angle
+        const GAMMA_LIMIT = 75;           // Maximum allowable tilt angle
 
         let lastTapTime = 0;
         let tapCount = 0;
