@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orientation Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: white;
+            transition: background-color 0.3s ease;
+        }
+        
+        .success {
+            background-color: #4CAF50;
+        }
+
+        #debug {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px;
+            font-family: monospace;
+            border-radius: 5px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="debug"></div>
+    <script>
+        const debugEl = document.getElementById('debug');
+        const body = document.body;
+        
+        // Configuration
+        const FACE_DOWN_THRESHOLD = 10; // degrees of tolerance
+        const PEEK_ANGLE_MIN = 30;  // minimum angle for peeking
+        const PEEK_ANGLE_MAX = 80;  // maximum angle for peeking
+        const TIME_THRESHOLD = 200; // 0.2 seconds in milliseconds
+
+        let faceDownStartTime = null;
+        let isFaceDown = false;
+
+        function requestPermission() {
+            if (typeof DeviceOrientationEvent !== 'undefined' && 
+                typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(response => {
+                        if (response === 'granted') {
+                            window.addEventListener('deviceorientation', handleOrientation);
+                        }
+                    })
+                    .catch(console.error);
+            } else {
+                window.addEventListener('deviceorientation', handleOrientation);
+            }
+        }
+
+        function handleOrientation(event) {
+            // Beta: front/back tilt (-180 to 180)
+            // Gamma: left/right tilt (-90 to 90)
+            // Alpha: compass direction (0 to 360)
+            const { beta, gamma } = event;
+            
+            // Debug info
+            debugEl.textContent = `Beta: ${Math.round(beta)}°\nGamma: ${Math.round(gamma)}°`;
+
+            // Check if phone is face down (beta ~= 180 or -180)
+            const isFacingDown = Math.abs(Math.abs(beta) - 180) < FACE_DOWN_THRESHOLD && 
+                               Math.abs(gamma) < FACE_DOWN_THRESHOLD;
+
+            if (isFacingDown && !isFaceDown) {
+                // Just started facing down
+                isFaceDown = true;
+                faceDownStartTime = Date.now();
+            } else if (!isFacingDown) {
+                // Not facing down anymore
+                isFaceDown = false;
+
+                // Check if we were face down long enough and now in peek position
+                if (faceDownStartTime && 
+                    (Date.now() - faceDownStartTime) >= TIME_THRESHOLD) {
+                    
+                    // Check if phone is now in peek position
+                    // We want beta to be between PEEK_ANGLE_MIN and PEEK_ANGLE_MAX
+                    // and gamma should be relatively small
+                    const isPeeking = beta > PEEK_ANGLE_MIN && 
+                                    beta < PEEK_ANGLE_MAX && 
+                                    Math.abs(gamma) < 20;
+
+                    if (isPeeking) {
+                        body.classList.add('success');
+                    } else {
+                        body.classList.remove('success');
+                    }
+                }
+            }
+        }
+
+        // Show debug info on tap
+        document.addEventListener('click', () => {
+            debugEl.style.display = debugEl.style.display === 'none' ? 'block' : 'none';
+        });
+
+        // Request permission and start monitoring
+        document.addEventListener('click', requestPermission, { once: true });
+    </script>
+</body>
+</html>
