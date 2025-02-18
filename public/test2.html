@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tap Detection Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: white;
+            transition: background-color 0.3s ease;
+            font-family: Arial, sans-serif;
+        }
+        
+        .success {
+            background-color: #4CAF50;
+        }
+
+        #debug {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px;
+            font-family: monospace;
+            border-radius: 5px;
+            display: none;
+        }
+
+        #instructions {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            font-size: 1.2em;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div id="debug"></div>
+    <div id="instructions">Tap to start, then tap twice on table to check</div>
+    <script>
+        const debugEl = document.getElementById('debug');
+        const body = document.body;
+        const instructions = document.getElementById('instructions');
+        
+        // Configuration
+        const TAP_THRESHOLD = 20;         // Minimum acceleration to register as a tap
+        const TAP_TIMEOUT = 500;          // Maximum time between taps (ms)
+        const COOLDOWN_PERIOD = 1000;     // Time before allowing new tap detection (ms)
+        const SUCCESS_DURATION = 2000;     // How long to show the green screen (ms)
+
+        let lastTapTime = 0;
+        let tapCount = 0;
+        let isInCooldown = false;
+        let permissionGranted = false;
+
+        function requestPermission() {
+            if (typeof DeviceMotionEvent !== 'undefined' && 
+                typeof DeviceMotionEvent.requestPermission === 'function') {
+                DeviceMotionEvent.requestPermission()
+                    .then(response => {
+                        if (response === 'granted') {
+                            permissionGranted = true;
+                            window.addEventListener('devicemotion', handleMotion);
+                            instructions.textContent = "Tap twice on table to check";
+                        }
+                    })
+                    .catch(console.error);
+            } else {
+                permissionGranted = true;
+                window.addEventListener('devicemotion', handleMotion);
+                instructions.textContent = "Tap twice on table to check";
+            }
+        }
+
+        function handleMotion(event) {
+            if (isInCooldown) return;
+
+            const acceleration = event.acceleration;
+            if (!acceleration) return;
+
+            // Calculate total acceleration magnitude
+            const magnitude = Math.sqrt(
+                Math.pow(acceleration.x || 0, 2) +
+                Math.pow(acceleration.y || 0, 2) +
+                Math.pow(acceleration.z || 0, 2)
+            );
+
+            // Debug info
+            debugEl.textContent = `Acceleration: ${Math.round(magnitude)}`;
+
+            // Check for tap
+            if (magnitude > TAP_THRESHOLD) {
+                const now = Date.now();
+
+                // If this is the first tap or it's been too long since last tap, reset
+                if (tapCount === 0 || (now - lastTapTime) > TAP_TIMEOUT) {
+                    tapCount = 1;
+                    lastTapTime = now;
+                }
+                // If this is a second tap within the time window
+                else if (tapCount === 1 && (now - lastTapTime) <= TAP_TIMEOUT) {
+                    tapCount = 0;
+                    isInCooldown = true;
+                    
+                    // Show success state
+                    body.classList.add('success');
+                    instructions.style.display = 'none';
+
+                    // Reset after success duration
+                    setTimeout(() => {
+                        body.classList.remove('success');
+                        instructions.style.display = 'block';
+                        isInCooldown = false;
+                    }, SUCCESS_DURATION);
+                }
+            }
+        }
+
+        // Show debug info on long press
+        let pressTimer;
+        document.addEventListener('touchstart', () => {
+            pressTimer = setTimeout(() => {
+                debugEl.style.display = debugEl.style.display === 'none' ? 'block' : 'none';
+            }, 1000);
+        });
+        document.addEventListener('touchend', () => {
+            clearTimeout(pressTimer);
+        });
+
+        // Request permission on first tap
+        document.addEventListener('click', () => {
+            if (!permissionGranted) {
+                requestPermission();
+            }
+        });
+    </script>
+</body>
+</html>
