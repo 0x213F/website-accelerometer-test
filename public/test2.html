@@ -29,6 +29,7 @@
             font-family: monospace;
             border-radius: 5px;
             display: none;
+            white-space: pre-line;
         }
 
         #instructions {
@@ -55,29 +56,54 @@
         const TAP_TIMEOUT = 500;          // Maximum time between taps (ms)
         const COOLDOWN_PERIOD = 1000;     // Time before allowing new tap detection (ms)
         const SUCCESS_DURATION = 2000;     // How long to show the green screen (ms)
+        const GAMMA_LIMIT = 60;           // Maximum allowable tilt angle
 
         let lastTapTime = 0;
         let tapCount = 0;
         let isInCooldown = false;
         let permissionGranted = false;
+        let currentBeta = 0;
+        let currentGamma = 0;
 
-        function requestPermission() {
+        function requestDeviceMotion() {
             if (typeof DeviceMotionEvent !== 'undefined' && 
                 typeof DeviceMotionEvent.requestPermission === 'function') {
                 DeviceMotionEvent.requestPermission()
                     .then(response => {
                         if (response === 'granted') {
-                            permissionGranted = true;
                             window.addEventListener('devicemotion', handleMotion);
+                            requestDeviceOrientation();
+                        }
+                    })
+                    .catch(console.error);
+            } else {
+                window.addEventListener('devicemotion', handleMotion);
+                requestDeviceOrientation();
+            }
+        }
+
+        function requestDeviceOrientation() {
+            if (typeof DeviceOrientationEvent !== 'undefined' && 
+                typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(response => {
+                        if (response === 'granted') {
+                            permissionGranted = true;
+                            window.addEventListener('deviceorientation', handleOrientation);
                             instructions.textContent = "Tap twice on table to check";
                         }
                     })
                     .catch(console.error);
             } else {
                 permissionGranted = true;
-                window.addEventListener('devicemotion', handleMotion);
+                window.addEventListener('deviceorientation', handleOrientation);
                 instructions.textContent = "Tap twice on table to check";
             }
+        }
+
+        function handleOrientation(event) {
+            currentBeta = event.beta;
+            currentGamma = event.gamma;
         }
 
         function handleMotion(event) {
@@ -94,10 +120,16 @@
             );
 
             // Debug info
-            debugEl.textContent = `Acceleration: ${Math.round(magnitude)}`;
+            debugEl.textContent = `Acceleration: ${Math.round(magnitude)}
+Beta: ${Math.round(currentBeta)}°
+Gamma: ${Math.round(currentGamma)}°`;
 
-            // Check for tap
-            if (magnitude > TAP_THRESHOLD) {
+            // Check orientation
+            const isValidOrientation = currentBeta <= 0 && // Phone is face up (negative beta)
+                                     Math.abs(currentGamma) <= GAMMA_LIMIT; // Not too tilted sideways
+
+            // Only process tap if orientation is valid
+            if (isValidOrientation && magnitude > TAP_THRESHOLD) {
                 const now = Date.now();
 
                 // If this is the first tap or it's been too long since last tap, reset
@@ -135,10 +167,10 @@
             clearTimeout(pressTimer);
         });
 
-        // Request permission on first tap
+        // Request permissions on first tap
         document.addEventListener('click', () => {
             if (!permissionGranted) {
-                requestPermission();
+                requestDeviceMotion();
             }
         });
     </script>
